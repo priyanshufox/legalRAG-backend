@@ -1,0 +1,31 @@
+services:
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - 6333:6333
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+
+  # FastAPI Backend Application
+  backend:
+    build: .
+    ports:
+      - 8000:8000
+    environment:
+      - SQLALCHEMY_DATABASE_URL=postgresql://doc_db_mj2w_user:D4JodLZ4j8RKoCGqM6jxNAtwghbj32x7@dpg-d36eoojuibrs739adr40-a.oregon-postgres.render.com/doc_db_mj2w
+      - QDRANT_URL=http://qdrant:6333
+      - UPLOAD_DIR=/app/uploads
+      - GEMINIAI_API_KEY=${GEMINIAI_API_KEY}
+      - MODEL_FOR_EMBEDDING=models/text-embedding-004
+      - MODEL_FOR_CHAT=models/gemini-2.5-flash
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
