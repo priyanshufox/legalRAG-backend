@@ -19,7 +19,7 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - UPLOAD_DIR=/app/uploads
       - GEMINIAI_API_KEY=${GEMINIAI_API_KEY}
-      - MODEL_FOR_EMBEDDING=models/text-embedding-004
+      - MODEL_FOR_EMBEDDING=models/text-embedding-3-large
       - MODEL_FOR_CHAT=models/gemini-2.5-flash
     volumes:
       - ./uploads:/app/uploads

@@ -20,6 +20,11 @@ enhancedQueryPrompt = f"""you're a helpful assistant, you're a part of an advanc
 strictly enhance the user query so that the retrieval of chunks from the vectorDB is more accurate.
 you don't have to answer or question to the user query, you just have to enhance it for further processes.
 if the query feels grammatically wrong, just try to enhance it to make a meaningful query.
+
+Special instructions:
+- If the user asks about "this PDF", "this document", or similar references, enhance the query to be more specific about document content
+- Include relevant keywords that would help find document content (e.g., if asking about a legal document, include terms like "case", "court", "legal", etc.)
+- Make the query more searchable while preserving the original intent
 """
 
 HyDe_Prompt = """you're a part of a RAG pipeline, and your task is to generate a well reasoned hypothetical answer for the user's query (HyDe).
@@ -27,7 +32,12 @@ HyDe_Prompt = """you're a part of a RAG pipeline, and your task is to generate a
 This hypothetical answer will be used further for the retrieval of relevant chunks from the vector database.
 So please be very accurate and don't answer the topics you're completely unaware of, just say no there.
 For eg: user asks about any real-time data such as date, weather, Politics, etc.
-Just simply don't reply to them as you don't have access to all of this."""
+Just simply don't reply to them as you don't have access to all of this.
+
+Special instructions:
+- If the user asks about "this PDF" or "this document", generate a hypothetical answer that would be typical for document content
+- Include relevant keywords and concepts that would likely appear in legal, business, or other document types
+- Make the hypothetical answer detailed enough to help retrieve relevant chunks from the database"""
 
 evaluator_prompt = """You are a chunk relevance evaluator.
 your task is to evaluate each retrieved chunk, whether the chunk is relevant to the user query or not.
@@ -85,6 +95,7 @@ def retrieve_relevant_chunks(query: str, top_k: int = 5, owner: str = None):
         text = payload.get("text")
         if text:
             chunks.append(text)
+    print(chunks)
     return chunks
 
 async def answer_query(query: str, top_k: int = 5, owner: str = None):
@@ -94,17 +105,17 @@ async def answer_query(query: str, top_k: int = 5, owner: str = None):
 
     print(enhanced_query)
 
-    hyde_query = await get_LLM_Response(queryLLM, HyDe_Prompt, query)
+    # hyde_query = await get_LLM_Response(queryLLM, HyDe_Prompt, query)
 
-    print(hyde_query)
+    # print(hyde_query)
 
-    new_prompt = f" {enhanced_query} \n\n {hyde_query} "
+    new_prompt = f" {enhanced_query} "
 
     
     chunks = retrieve_relevant_chunks(new_prompt, top_k=top_k, owner=owner)
     # build a simple prompt
     context = "\n\n---\n\n".join(chunks)
-    prompt = f"""You are a helpful assistant. Answer the user's question based on the information provided below. Do not mention where the information comes from or reference any technical details about context or chunks.
+    prompt = f"""You are a helpful assistant that answers questions based on the provided information. Use the information below to answer the user's question comprehensively and accurately.
 
 INFORMATION:
 {context}
@@ -112,63 +123,17 @@ INFORMATION:
 QUESTION:
 {query}
 
-Answer the question naturally and conversationally, as if you simply know this information.
+INSTRUCTIONS:
+- Answer the question based ONLY on the information provided above
+- If the information contains relevant details about the topic, use them to provide a complete answer
+- Do not say the information doesn't contain details about the topic if relevant content is clearly present
+- Be specific and detailed in your response
+- If the user asks about "this PDF" or "this document", refer to the content as if it's the document they're asking about
 """
-    model = genai.GenerativeModel(CHAT_MODEL)
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.types.GenerationConfig(
-            max_output_tokens=500,
-            temperature=0.0
-        )
-    )
+    # model = genai.GenerativeModel(CHAT_MODEL)
+    response = await get_LLM_Response(CHAT_MODEL, prompt, query)
     
-    # Handle potential content filtering or empty responses
-    if response.candidates and len(response.candidates) > 0:
-        candidate = response.candidates[0]
-        if candidate.finish_reason == 1:  # STOP - normal completion
-            try:
-                answer = response.text.strip()
-            except Exception:
-                answer = "Response generated but could not be accessed. Please try again."
-        elif candidate.finish_reason == 2:  # MAX_TOKENS
-            try:
-                answer = response.text.strip() if response.text else "Response was truncated due to length limits."
-            except Exception:
-                answer = "Response was truncated due to length limits."
-        elif candidate.finish_reason == 3:  # SAFETY
-            answer = "I cannot provide a response to this query due to safety concerns."
-        elif candidate.finish_reason == 4:  # RECITATION
-            answer = "I cannot provide a response to this query due to recitation concerns."
-        else:
-            answer = "I encountered an issue generating a response. Please try rephrasing your question."
-    else:
-        answer = "No response generated. Please try again with a different query."
     
-    # Clean up any context references that might have slipped through
-    import re
-    
-    # Split on context references and take only the first part
-    print(f"Original answer: {answer}")
-    
-    context_markers = [
-        '(Context:', '(context:', 
-        '(Context chunks', '(context chunks',
-        '(Context chunks starting with',
-        '(context chunks starting with'
-    ]
-    
-    for marker in context_markers:
-        if marker in answer:
-            print(f"Found marker: {marker}")
-            answer = answer.split(marker)[0]
-            print(f"Cleaned answer: {answer}")
-            break
-    
-    # Clean up extra whitespace and newlines
-    answer = re.sub(r'\n+', '\n', answer)
-    answer = re.sub(r'\s+', ' ', answer)  # Replace multiple spaces with single space
-    answer = answer.strip()
-    
-    return {"answer": answer, "context_chunks": chunks}
+    return {"answer": response, "context_chunks": chunks}
+    return {response}
 

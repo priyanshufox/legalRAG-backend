@@ -39,6 +39,6 @@ async def query(
 ):
     try:
         out = await answer_query(req.query, top_k=5, owner="mvp_user")
-        return {"answer": out["answer"], "sources": out["context_chunks"]}
+        return {"answer": out["answer"]}
     except Exception as e:
         return {"answer": f"I encountered an error: {str(e)}. Please make sure you have uploaded some documents first.", "sources": []}
