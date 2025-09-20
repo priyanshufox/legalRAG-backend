@@ -5,7 +5,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
-qdrant = QdrantClient(url=QDRANT_URL)
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+# Initialize Qdrant client with optional API key for cloud instances
+if QDRANT_API_KEY:
+    qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+else:
+    qdrant = QdrantClient(url=QDRANT_URL)
 
 def ensure_collection(collection_name: str, vector_size: int):
     # create collection if not exists (simple config)

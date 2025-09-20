@@ -17,6 +17,7 @@ services:
     environment:
       - SQLALCHEMY_DATABASE_URL=postgresql://doc_db_mj2w_user:D4JodLZ4j8RKoCGqM6jxNAtwghbj32x7@dpg-d36eoojuibrs739adr40-a.oregon-postgres.render.com/doc_db_mj2w
       - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
       - UPLOAD_DIR=/app/uploads
       - GEMINIAI_API_KEY=${GEMINIAI_API_KEY}
       - MODEL_FOR_EMBEDDING=models/text-embedding-004
