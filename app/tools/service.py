@@ -322,83 +322,89 @@ async def search_indian_kanoon(keywords_query: str) -> list:
         list: List of case documents from Indian Kanoon
     """
     try:
+        print(f"=== DEBUGGING API CALL ===")
         print(f"Searching Indian Kanoon with query: {keywords_query}")
         
-      
         # Try different API endpoint formats
-        urls_to_try = []
-      
-        urls_to_try.extend([
-                f"https://api.indiankanoon.org/search/?formInput={keywords_query}&maxcites=20"
-            ])
-        
-        
+        urls_to_try = [
+            f"https://api.indiankanoon.org/search/?formInput={keywords_query}&maxcites=20"
+        ]
         
         headers = {
             "Authorization": "Token 2fd24155d6a517d98380225b5968a93cab4a362d",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
         
+        print(f"Headers being sent: {headers}")
+        
         for url in urls_to_try:
             try:
+                print(f"=== ATTEMPTING API CALL ===")
                 print(f"Trying URL: {url}")
                 
                 if "?" in url:
                     # GET request with query parameters
-                    response = requests.get(url, headers=headers, timeout=30)
+                    print("Making GET request...")
+                    response = requests.post(url, headers=headers, timeout=30)
                 else:
                     # POST request with form data
+                    print("Making POST request...")
                     post_data = {
                         "formInput": keywords_query,
                         "maxcites": 20
                     }
+                    print(f"POST data: {post_data}")
                     response = requests.post(url, data=post_data, headers=headers, timeout=30)
                 
+                print(f"=== API RESPONSE ===")
                 print(f"Response status: {response.status_code}")
                 print(f"Response headers: {dict(response.headers)}")
+                print(f"Response content length: {len(response.content)}")
                 
                 if response.status_code == 200:
-                    data = response.json()
-                    print(f"Response data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
-                    
-                    # Extract only the docs array from the response
-                    if 'docs' in data:
-                        docs = data['docs']
-                        print(f"Found {len(docs)} documents")
-                        return docs
-                    else:
-                        print("No 'docs' key in response")
-                        print(f"Full response: {data}")
+                    try:
+                        data = response.json()
+                        print(f"Response data type: {type(data)}")
+                        print(f"Response data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+                        
+                        # Extract only the docs array from the response
+                        if 'docs' in data:
+                            docs = data['docs']
+                            print(f"SUCCESS: Found {len(docs)} documents from API")
+                            return docs
+                        else:
+                            print("WARNING: No 'docs' key in response")
+                            print(f"Full response: {data}")
+                            # Still return empty list instead of mock data
+                            return []
+                    except json.JSONDecodeError as json_err:
+                        print(f"JSON decode error: {json_err}")
+                        print(f"Raw response text: {response.text[:500]}...")
                         return []
                 else:
-                    print(f"Failed with status {response.status_code}: {response.text}")
+                    print(f"API call failed with status {response.status_code}")
+                    print(f"Response text: {response.text}")
                     
+            except requests.exceptions.Timeout:
+                print(f"TIMEOUT: Request to {url} timed out after 30 seconds")
+                continue
+            except requests.exceptions.ConnectionError as conn_err:
+                print(f"CONNECTION ERROR: {conn_err}")
+                continue
             except Exception as e:
-                print(f"Error with URL {url}: {str(e)}")
+                print(f"UNEXPECTED ERROR with URL {url}: {type(e).__name__}: {str(e)}")
                 continue
         
-        # If all URLs failed, return mock data for testing
-        print("All API endpoints failed, returning mock data for testing")
-        return [
-            {
-                "title": f"Sample Case 1 - {keywords_query}",
-                "court": "Supreme Court of India",
-                "date": "2023-01-15",
-                "citation": "2023 SCC 123",
-                "tid": "123456"
-            },
-            {
-                "title": f"Sample Case 2 - {keywords_query}",
-                "court": "High Court of Delhi",
-                "date": "2023-02-20",
-                "citation": "2023 DLH 456",
-                "tid": "789012"
-            }
-        ]
+        # If all URLs failed, raise an exception instead of returning mock data
+        print("=== ALL API CALLS FAILED ===")
+        print("CRITICAL: All API endpoints failed - this is why you're getting dummy data!")
+        raise Exception("All Indian Kanoon API endpoints failed. Check your network connection, API key, or API endpoint.")
             
     except Exception as e:
+        print(f"=== FINAL ERROR ===")
         print(f"Error in search_indian_kanoon: {str(e)}")
-        return []
+        # Re-raise the exception instead of returning empty list
+        raise e
 
 def format_case_results(docs: list) -> list:
     """
@@ -448,36 +454,63 @@ async def find_similar_cases(query: str = None, pdf_path: str = None) -> dict:
         dict: Formatted case results
     """
     try:
+        print(f"=== FIND_SIMILAR_CASES CALLED ===")
+        print(f"Query: {query}")
+        print(f"PDF Path: {pdf_path}")
+        
         # Determine input text
         if pdf_path:
-            # Extract text from PDF
+            print("Extracting text from PDF...")
             input_text = await extract_text_from_pdf(pdf_path)
+            print(f"Extracted text length: {len(input_text)} characters")
         elif query:
             input_text = query
+            print(f"Using query text: {input_text}")
         else:
             raise ValueError("Either query or pdf_path must be provided")
         
         # Extract keywords
+        print("Extracting keywords...")
         keywords_data = await extract_keywords_from_text(input_text)
+        print(f"Extracted keywords: {keywords_data}")
         
         # Search Indian Kanoon
+        print("Searching Indian Kanoon API...")
         docs = await search_indian_kanoon(keywords_data['apiQuery'])
+        print(f"API returned {len(docs)} documents")
         
         # Format results
         formatted_cases = format_case_results(docs)
+        print(f"Formatted {len(formatted_cases)} cases for frontend")
         
         return {
             "success": True,
             "keywords": keywords_data['keywords'],
             "api_query": keywords_data['apiQuery'],
             "cases": formatted_cases,
-            "total_cases": len(formatted_cases)
+            "total_cases": len(formatted_cases),
+            "debug_info": {
+                "input_text_length": len(input_text),
+                "extracted_keywords": keywords_data['keywords'],
+                "api_query_used": keywords_data['apiQuery'],
+                "raw_docs_count": len(docs)
+            }
         }
         
     except Exception as e:
+        print(f"=== ERROR IN find_similar_cases ===")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        
         return {
             "success": False,
             "error": str(e),
+            "error_type": type(e).__name__,
             "cases": [],
-            "total_cases": 0
+            "total_cases": 0,
+            "debug_info": {
+                "query_provided": query is not None,
+                "pdf_path_provided": pdf_path is not None,
+                "error_details": str(e)
+            }
         }
