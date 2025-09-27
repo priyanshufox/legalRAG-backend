@@ -11,12 +11,18 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Simple RAG FastAPI")
 
-# Add CORS middleware - Allow all origins for now
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "http://localhost:3001",  # Alternative local port
+        "https://legal-fa3mhai75-priyanshufoxs-projects.vercel.app",  # Your Vercel deployment
+        "https://*.vercel.app",  # All Vercel apps
+        "*"  # Allow all origins as fallback
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
